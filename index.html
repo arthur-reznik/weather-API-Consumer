@@ -1,0 +1,170 @@
+<html lang="en">
+    <head>
+        <!-- Required meta tags -->
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <!-- Bootstrap CSS -->
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+            integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl"
+            crossorigin="anonymous">
+
+        <title>ClimAgora</title>
+    </head>
+    <body>
+        <div class="container">
+            <header class="blog-header py-3">
+                <div class="row flex-nowrap justify-content-between align-items-center">
+                    <div class="col text-center"><span class="h1">ClimAgora</span></div>
+                </div>
+            </header>
+        </div>
+
+        <div class="container">
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <div
+                        class="row g-0 border rounded overflow-hidden flex-md-row mb-4 shadow-sm h-md-250 position-relative">
+                        <div class="col p-4 d-flex flex-column position-static">
+                            <form>
+                                <p><input type="text" id="inputSearch" class="form-control" placeholder="Cidade" required="" autofocus="">
+                                <span id="SearchHelp" class="form-text">Você também pode indicar o país da cidade, por exemplo: Itajuba, BR</span></p>
+                                <button class="btn btn-primary" id="botao">Pesquisar</button>
+                                <div id="searchError" class="d-none"></div>
+                            </form>                            
+                        </div>
+                        <hr>
+                        <div class="col p-4 d-flex flex-column position-static d-none" id="searchResult">
+                            <dl class="row">
+                                <dt class="col-sm-3">Cidade</dt>
+                                <dd class="col-sm-9" id="cidadeText"></dd>
+                              
+                                <dt class="col-sm-3">País</dt>
+                                <dd class="col-sm-9" id="paisText"></dd>
+                              
+                                <dt class="col-sm-3">Temperatura</dt>
+                                <dd class="col-sm-9" id="temperaturaText"></dd>
+
+                                <dt class="col-sm-3">Umidade</dt>
+                                <dd class="col-sm-9" id="umidadeText"></dd>
+
+                                <dt class="col-sm-3">Clima</dt>
+                                <dd class="col-sm-9" id="climaText"></dd>
+                              </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div
+                        class="row g-0 border rounded overflow-hidden flex-md-row mb-4 shadow-sm h-md-250 position-relative">
+                        <strong class="d-inline-block mb-2 text-primary">Mais Pesquisados</strong>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Cidade</th>
+                                    <th>País</th>
+                                </tr>                            
+                            </thead>
+                            <tbody id="topSearch"></tbody>
+                        </table>
+                    </div>
+                    <hr>
+                    <div
+                        class="row g-0 border rounded overflow-hidden flex-md-row mb-4 shadow-sm h-md-250 position-relative">
+                        <strong class="d-inline-block mb-2 text-primary">Suas Últimas Pesquisas</strong>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Cidade</th>
+                                    <th>País</th>
+                                </tr>                            
+                            </thead>
+                            <tbody id="historyBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script
+            src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <script>
+            var historico;
+            
+            async function printTops() {
+                let tops = await $.ajax({url: "http://localhost:3000/api/top"});
+                $("#topSearch").text("");
+                if(tops){
+                    tops.forEach((top) => {
+                        $("#topSearch").append("<tr><td>"+top.name+"</td><td>"+top.country+"</td></tr>")
+                    })
+                }
+            }
+            
+            function printHistory(item){
+                //item is null when first loading the page
+                if(item){
+                    historico.unshift(item);
+                    if(historico.length > 5){
+                        historico.pop();
+                    }
+                }
+                
+                //clear the table data and re add items
+                $("#historyBody").html("");
+                historico.forEach((histItem) => {
+                    $("#historyBody").append("<tr><td>"+histItem.name+"</td><td>"+histItem.country+"</td></tr>");
+                    })
+
+                //updated the stored value
+                localStorage.setItem('h',JSON.stringify(historico));
+            }
+
+            function loadHistory(){
+
+                loaded = localStorage.getItem("h");
+                if(Array.isArray(historico)){
+                    historico = Array.from(JSON.parse(loaded));
+                    printHistory(null);
+                }
+                else
+                    historico = Array();
+            }
+
+            $("#botao").click(async (e) => {
+                e.preventDefault();
+
+                let busca = $("#inputSearch").val();
+                if (busca == "")
+                    return
+                $("#inputSearch").val("");
+                try{
+                    let req = await $.ajax({url : "http://localhost:3000/api/search?name="+busca});
+                    if(req){
+                        $("#cidadeText").text(req.name);
+                        $("#paisText").text(req.sys.country);
+                        $("#umidadeText").text(req.main.humidity+"%");
+                        $("#temperaturaText").text(req.main.temp+"ºC");
+                        $("#climaText").text(req.weather[0].main);
+                        $("#searchResult").removeClass("d-none");
+                        $("#searchError").addClass("d-none")
+                        printTops();
+                        new_item = new Object({name : req.name, country : req.sys.country})
+                        printHistory(new_item)
+                    }       
+                }
+                catch(err){
+                    $("#searchError").html("<span>Cidade não encontrada</span>");
+                    $("#searchError").removeClass("d-none")
+                    $("#searchResult").addClass("d-none");
+                    return;
+                }         
+            });
+
+            $(document).ready( () => {printTops(); loadHistory() } );
+
+        </script>
+    </body>
+</html>
